@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Color Harmony Studio</title>
+
+<style>
+
+*{
+box-sizing:border-box;
+font-family:Inter,system-ui,-apple-system,sans-serif;
+}
+
+body{
+margin:0;
+min-height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+background:linear-gradient(135deg,#eef2f7,#f8fafc);
+padding:20px;
+}
+
+.app{
+width:100%;
+max-width:520px;
+padding:32px;
+border-radius:24px;
+background:rgba(255,255,255,0.85);
+backdrop-filter:blur(16px);
+box-shadow:
+0 20px 60px rgba(0,0,0,0.08),
+0 4px 10px rgba(0,0,0,0.05);
+}
+
+h1{
+margin:0 0 24px;
+font-weight:600;
+font-size:24px;
+color:#111;
+letter-spacing:-0.3px;
+}
+
+.controls{
+display:flex;
+gap:10px;
+margin-bottom:20px;
+flex-wrap:wrap;
+}
+
+input[type=color]{
+width:48px;
+height:42px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+background:none;
+}
+
+select{
+flex:1;
+border:none;
+border-radius:10px;
+padding:10px;
+background:#f3f4f6;
+font-size:14px;
+}
+
+button{
+flex:1;
+border:none;
+border-radius:10px;
+padding:10px;
+background:linear-gradient(135deg,#6366f1,#4f46e5);
+color:white;
+font-weight:500;
+cursor:pointer;
+transition:all .25s ease;
+}
+
+button:hover{
+transform:translateY(-1px);
+box-shadow:0 8px 20px rgba(79,70,229,0.25);
+}
+
+.palette{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(90px,1fr));
+gap:12px;
+margin-top:18px;
+}
+
+.color-card{
+height:120px;
+border-radius:16px;
+display:flex;
+align-items:flex-end;
+justify-content:center;
+padding:10px;
+font-size:12px;
+font-weight:600;
+color:white;
+cursor:pointer;
+position:relative;
+overflow:hidden;
+transition:transform .25s ease, box-shadow .25s ease;
+}
+
+.color-card::after{
+content:"";
+position:absolute;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:linear-gradient(to top,rgba(0,0,0,0.35),transparent);
+}
+
+.color-card span{
+position:relative;
+z-index:2;
+}
+
+.color-card:hover{
+transform:translateY(-4px);
+box-shadow:0 12px 30px rgba(0,0,0,0.15);
+}
+
+.export{
+margin-top:20px;
+display:flex;
+gap:10px;
+}
+
+textarea{
+width:100%;
+height:90px;
+margin-top:10px;
+border-radius:12px;
+border:none;
+padding:12px;
+background:#f3f4f6;
+font-size:13px;
+font-family:monospace;
+}
+
+.footer{
+margin-top:14px;
+font-size:12px;
+color:#6b7280;
+text-align:center;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<h1>Color Harmony Studio</h1>
+
+<div class="controls">
+
+<input type="color" id="baseColor" value="#7a9e7e">
+
+<select id="mode">
+<option value="complementary">Complementary</option>
+<option value="triadic">Triadic</option>
+<option value="pastel">Pastel</option>
+<option value="earthy">Earthy</option>
+</select>
+
+<button onclick="generate()">Generate</button>
+
+</div>
+
+<div class="upload">
+<input type="file" accept="image/*" onchange="extractColors(event)">
+</div>
+
+<img id="preview">
+
+<div class="palette" id="palette"></div>
+
+<button onclick="exportCSS()">Export CSS</button>
+<button onclick="exportTailwind()">Export Tailwind</button>
+
+<textarea id="export"></textarea>
+
+</div>
+
+<script>
+
+function hexToHsl(H){
+let r=0,g=0,b=0;
+r="0x"+H[1]+H[2]; g="0x"+H[3]+H[4]; b="0x"+H[5]+H[6];
+r/=255; g/=255; b/=255;
+let cmin=Math.min(r,g,b), cmax=Math.max(r,g,b);
+let delta=cmax-cmin;
+let h=0,s=0,l=0;
+
+if(delta==0) h=0;
+else if(cmax==r) h=((g-b)/delta)%6;
+else if(cmax==g) h=(b-r)/delta+2;
+else h=(r-g)/delta+4;
+
+h=Math.round(h*60);
+if(h<0)h+=360;
+
+l=(cmax+cmin)/2;
+s=delta==0?0:delta/(1-Math.abs(2*l-1));
+
+return {h,s:l*100,l:l*100};
+}
+
+function hslToHex(h,s,l){
+
+s/=100;
+l/=100;
+
+let c=(1-Math.abs(2*l-1))*s;
+let x=c*(1-Math.abs((h/60)%2-1));
+let m=l-c/2;
+
+let r=0,g=0,b=0;
+
+if(0<=h&&h<60){r=c;g=x}
+else if(60<=h&&h<120){r=x;g=c}
+else if(120<=h&&h<180){g=c;b=x}
+else if(180<=h&&h<240){g=x;b=c}
+else if(240<=h&&h<300){r=x;b=c}
+else{r=c;b=x}
+
+r=Math.round((r+m)*255).toString(16).padStart(2,"0");
+g=Math.round((g+m)*255).toString(16).padStart(2,"0");
+b=Math.round((b+m)*255).toString(16).padStart(2,"0");
+
+return "#"+r+g+b;
+}
+
+function generate(){
+
+let base=document.getElementById("baseColor").value;
+let {h}=hexToHsl(base);
+let mode=document.getElementById("mode").value;
+
+let colors=[];
+
+if(mode=="complementary")
+colors=[base,hslToHex((h+180)%360,60,50)];
+
+if(mode=="triadic")
+colors=[base,hslToHex((h+120)%360,60,50),hslToHex((h+240)%360,60,50)];
+
+if(mode=="pastel")
+colors=[
+hslToHex(h,40,85),
+hslToHex((h+30)%360,40,85),
+hslToHex((h+60)%360,40,85),
+hslToHex((h+90)%360,40,85)
+];
+
+if(mode=="earthy")
+colors=["#6b705c","#a5a58d","#b7b7a4","#cb997e","#ddbea9"];
+
+render(colors);
+div.innerHTML = "<span>"+c+"</span>";
+}
+
+function render(colors){
+
+let palette=document.getElementById("palette");
+palette.innerHTML="";
+
+colors.forEach(c=>{
+
+let div=document.createElement("div");
+div.className="color-card";
+div.style.background=c;
+div.innerText=c;
+
+div.onclick=()=>{
+navigator.clipboard.writeText(c);
+};
+
+palette.appendChild(div);
+
+});
+
+}
+
+function exportCSS(){
+
+let colors=[...document.querySelectorAll(".color-card")].map(c=>c.innerText);
+
+let css=":root{\n";
+
+colors.forEach((c,i)=>{
+css+=`--color${i+1}:${c};\n`;
+});
+
+css+="}";
+
+document.getElementById("export").value=css;
+
+}
+
+function exportTailwind(){
+
+let colors=[...document.querySelectorAll(".color-card")].map(c=>c.innerText);
+
+let tw="colors:{\n";
+
+colors.forEach((c,i)=>{
+tw+=`c${i+1}:'${c}',\n`;
+});
+
+tw+="}";
+
+document.getElementById("export").value=tw;
+
+}
+
+function extractColors(event){
+
+let file=event.target.files[0];
+let img=document.getElementById("preview");
+img.src=URL.createObjectURL(file);
+
+let canvas=document.createElement("canvas");
+let ctx=canvas.getContext("2d");
+
+img.onload=function(){
+
+canvas.width=img.width;
+canvas.height=img.height;
+
+ctx.drawImage(img,0,0);
+
+let data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+
+let colors=[];
+
+for(let i=0;i<data.length;i+=500){
+
+let r=data[i];
+let g=data[i+1];
+let b=data[i+2];
+
+let hex="#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+
+colors.push(hex);
+
+}
+
+render(colors.slice(0,6));
+
+}
+
+}
+
+generate();
+
+</script>
+
+</body>
+</html>
